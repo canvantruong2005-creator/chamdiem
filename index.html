@@ -113,7 +113,8 @@
             setResult(null);
 
             try {
-              const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+              // Sử dụng model gemini-1.5-flash phiên bản public để chạy được trên Vercel/GitHub Pages
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
               
               const promptText = `Bạn là một giáo viên dạy Tiếng Việt lớp 5 xuất sắc. 
               Nhiệm vụ:
@@ -190,7 +191,8 @@
                 throw new Error("Không nhận được phản hồi hợp lệ từ AI");
               }
             } catch (err) {
-              setError('Lỗi kết nối hoặc chữ viết trong ảnh không thể nhận diện. Vui lòng thử lại.');
+              // Hiển thị lỗi chi tiết để dễ dàng kiểm tra
+              setError(`Lỗi hệ thống: ${err.message}. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`);
               console.error(err);
             } finally {
               setIsScoring(false);
