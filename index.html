@@ -35,15 +35,14 @@
 
     <!-- Mã nguồn React -->
     <script type="text/babel" data-type="module">
-        import React, { useState, useRef } from 'react';
+        import React, { useState } from 'react';
         import { createRoot } from 'react-dom/client';
         import { 
           CheckCircle2, AlertCircle, Edit3, Sparkles, BarChart3, BookOpen, 
-          PenTool, ThumbsUp, Lightbulb, Loader2, Image as ImageIcon, FileDown,
-          UploadCloud, X, FileText
+          PenTool, ThumbsUp, Lightbulb, Loader2, FileDown, FileText
         } from 'lucide-react';
 
-        // Tích hợp API Key người dùng cung cấp để chạy trên GitHub Pages
+        // API Key đã được tích hợp để chạy trên Web
         const apiKey = "AIzaSyD4xsLpsGF6hx7B2dxelytePdY0jsCCYgE"; 
 
         const fetchWithRetry = async (url, options, retries = 5) => {
@@ -54,7 +53,6 @@
               if (!response.ok) {
                 let errorMsg = `HTTP error! status: ${response.status}`;
                 try {
-                  // Lấy thông báo lỗi chi tiết từ Google API
                   const errorData = await response.json();
                   if (errorData.error && errorData.error.message) {
                     errorMsg = errorData.error.message;
@@ -71,50 +69,14 @@
         };
 
         function SmartScoringApp() {
-          const [activeTab, setActiveTab] = useState('image'); // 'image' or 'text'
           const [text, setText] = useState('');
-          const [imagePreview, setImagePreview] = useState(null);
-          const [imageBase64, setImageBase64] = useState(null);
           const [isScoring, setIsScoring] = useState(false);
           const [result, setResult] = useState(null);
           const [error, setError] = useState('');
-          const fileInputRef = useRef(null);
-
-          // Xử lý khi upload ảnh
-          const handleImageUpload = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-              if (file.size > 5 * 1024 * 1024) {
-                setError('Kích thước ảnh quá lớn. Vui lòng chọn ảnh dưới 5MB.');
-                return;
-              }
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                setImagePreview(reader.result);
-                // Tách phần base64 data ra khỏi chuỗi
-                const base64Data = reader.result.split(',')[1];
-                const mimeType = reader.result.split(';')[0].split(':')[1];
-                setImageBase64({ mimeType, data: base64Data });
-                setError('');
-                setResult(null);
-              };
-              reader.readAsDataURL(file);
-            }
-          };
-
-          const removeImage = () => {
-            setImagePreview(null);
-            setImageBase64(null);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-          };
 
           const handleScore = async () => {
-            if (activeTab === 'text' && !text.trim()) {
-              setError('Vui lòng nhập bài viết của học sinh.');
-              return;
-            }
-            if (activeTab === 'image' && !imageBase64) {
-              setError('Vui lòng tải lên ảnh chụp bài viết của học sinh.');
+            if (!text.trim()) {
+              setError('Vui lòng nhập bài viết của học sinh trước khi chấm điểm.');
               return;
             }
 
@@ -123,44 +85,32 @@
             setResult(null);
 
             try {
-              // Sử dụng model gemini-1.5-flash phiên bản public để chạy được trên Vercel/GitHub Pages
+              // Sử dụng model gemini-1.5-flash chạy trên môi trường thực tế
               const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
               
+              // Prompt tập trung hoàn toàn vào việc chấm điểm và nhận xét văn bản
               const promptText = `Bạn là một giáo viên dạy Tiếng Việt lớp 5 xuất sắc. 
-              Nhiệm vụ:
-              1. Nếu có hình ảnh đính kèm, hãy đọc (OCR) nét chữ viết tay trong hình để lấy nội dung bài văn.
-              2. Nếu không có hình, hãy dùng văn bản được cung cấp: "${activeTab === 'text' ? text : ''}"
-              3. Hãy chấm điểm đoạn văn dựa trên thang điểm 10.
+              Hãy chấm điểm và nhận xét chi tiết đoạn văn sau của học sinh trên thang điểm 10:
+              
+              Bài làm: "${text}"
               
               Tiêu chí chấm điểm:
-              1. Ý tưởng sáng tạo (tối đa 2.0 điểm): Độc đáo, có chi tiết đặc sắc.
-              2. Bố cục logic (tối đa 2.0 điểm): Đủ ý, liên kết mạch lạc.
-              3. Cảm xúc chân thực (tối đa 2.0 điểm): Thể hiện rõ tình cảm.
-              4. Ngữ pháp (tối đa 1.5 điểm): Đúng cấu trúc câu, dùng từ chính xác.
-              5. Chính tả (tối đa 1.5 điểm): Ít lỗi sai.
-              6. Trình bày (tối đa 1.0 điểm): Sạch đẹp, ngắt nghỉ hợp lý.
+              1. Ý tưởng (tối đa 2.0đ): Độc đáo, có chi tiết đặc sắc.
+              2. Bố cục (tối đa 2.0đ): Đủ ý, liên kết mạch lạc.
+              3. Cảm xúc (tối đa 2.0đ): Thể hiện rõ tình cảm, tự nhiên.
+              4. Ngữ pháp (tối đa 1.5đ): Đúng cấu trúc câu, dùng từ gợi tả chính xác.
+              5. Chính tả (tối đa 1.5đ): Ít lỗi sai.
+              6. Trình bày (tối đa 1.0đ): Ngắt nghỉ hợp lý, chấm phẩy rõ ràng.
               
               Phân loại: Xuất sắc (9-10), Tốt (7-8.9), Đạt yêu cầu (5-6.9), Cần cải thiện (<5).`;
 
-              // Xây dựng payload
-              const parts = [{ text: promptText }];
-              if (activeTab === 'image' && imageBase64) {
-                parts.push({
-                  inlineData: {
-                    mimeType: imageBase64.mimeType,
-                    data: imageBase64.data
-                  }
-                });
-              }
-
               const payload = {
-                contents: [{ role: "user", parts: parts }],
+                contents: [{ role: "user", parts: [{ text: promptText }] }],
                 generationConfig: {
                   responseMimeType: "application/json",
                   responseSchema: {
                     type: "OBJECT",
                     properties: {
-                      extractedText: { type: "STRING", description: "Đoạn văn mà AI đọc được từ ảnh (nếu tải ảnh)" },
                       totalScore: { type: "NUMBER", description: "Tổng điểm" },
                       classification: { type: "STRING" },
                       criteria: {
@@ -183,7 +133,7 @@
                         }
                       }
                     },
-                    required: ["extractedText", "totalScore", "classification", "criteria", "feedback"]
+                    required: ["totalScore", "classification", "criteria", "feedback"]
                   }
                 }
               };
@@ -201,12 +151,10 @@
                 throw new Error("Không nhận được phản hồi hợp lệ từ AI");
               }
             } catch (err) {
-              // Phân biệt lỗi rõ ràng để người dùng không bị nhầm lẫn
               if (err.message.includes("API key not valid") || err.message.includes("API_KEY_INVALID")) {
                 setError("Lỗi: API Key của bạn không hợp lệ hoặc không có quyền truy cập. Vui lòng kiểm tra lại mã API.");
               } else {
-                const action = activeTab === 'text' ? 'chấm điểm văn bản' : 'đọc ảnh';
-                setError(`Lỗi hệ thống khi ${action}: ${err.message}`);
+                setError(`Lỗi hệ thống khi chấm điểm: ${err.message}`);
               }
               console.error(err);
             } finally {
@@ -214,7 +162,6 @@
             }
           };
 
-          // Hàm xuất file Word (.doc)
           const exportToWord = () => {
             if (!result) return;
             
@@ -228,7 +175,7 @@
                 .total-score { font-size: 24pt; font-weight: bold; color: #2563eb; }
                 ul { margin-top: 5px; }
                 li { margin-bottom: 5px; }
-                .text-content { background-color: #f1f5f9; padding: 15px; font-style: italic; border-left: 4px solid #94a3b8; }
+                .text-content { background-color: #f1f5f9; padding: 15px; font-style: italic; border-left: 4px solid #94a3b8; margin-top: 10px; }
               </style></head><body>`;
             
             const footer = "</body></html>";
@@ -252,7 +199,7 @@
                 <li><strong>Trình bày:</strong> ${result.criteria.trinhBay}/1.0</li>
               </ul>
 
-              <h2>2. Nhận xét của Giáo viên:</h2>
+              <h2>2. Nhận xét của Giáo viên (AI Hỗ trợ):</h2>
               <p><strong>🌟 Điểm mạnh (Cần phát huy):</strong></p>
               <ul>${result.feedback.strengths.map(s => `<li>${s}</li>`).join('')}</ul>
               
@@ -262,13 +209,13 @@
               <p><strong>💡 Gợi ý sửa đổi:</strong></p>
               <ul>${result.feedback.suggestions.map(s => `<li>${s}</li>`).join('')}</ul>
 
-              <h2>3. Nội dung bài viết (AI nhận diện từ ảnh):</h2>
+              <h2>3. Bài làm của học sinh:</h2>
               <div class="text-content">
-                <p>${result.extractedText || text || "Không có dữ liệu văn bản."}</p>
+                <p>${text.replace(/\n/g, '<br/>')}</p>
               </div>
               
               <br/><br/>
-              <p style="text-align: right;"><strong>Giáo viên nhận xét</strong><br/><br/><i>(Hệ thống AI Hỗ trợ đánh giá)</i></p>
+              <p style="text-align: right;"><strong>Giáo viên nhận xét</strong><br/><br/><i>(Cô Nguyễn Thị Vân)</i></p>
             `;
 
             const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
@@ -334,84 +281,37 @@
                       <Sparkles className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                      <h1 className="text-2xl font-bold text-slate-900">Chấm Điểm Thông Minh (AI)</h1>
-                      <p className="text-slate-500 text-sm">Upload ảnh bài viết &gt; Nhận diện OCR &gt; AI Phân tích &gt; Xuất Word</p>
+                      <h1 className="text-2xl font-bold text-slate-900">Hệ Thống Chấm Điểm AI</h1>
+                      <p className="text-slate-500 text-sm">Nhập văn bản &gt; AI Phân tích 6 tiêu chí &gt; Nhận xét tự động &gt; Xuất Word</p>
                     </div>
                   </div>
                 </header>
 
-                {/* Main Content Layout */}
                 <div className="grid lg:grid-cols-2 gap-6">
-                  
                   {/* Left Column: Input Section */}
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-12rem)] min-h-[600px]">
-                    <div className="flex border-b border-slate-200 bg-slate-50">
-                      <button 
-                        onClick={() => setActiveTab('image')}
-                        className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'image' ? 'bg-white text-blue-600 border-t-2 border-t-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        <ImageIcon className="w-5 h-5" />
-                        Chụp ảnh / Tải ảnh lên
-                      </button>
-                      <button 
-                        onClick={() => setActiveTab('text')}
-                        className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'text' ? 'bg-white text-blue-600 border-t-2 border-t-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        <FileText className="w-5 h-5" />
-                        Nhập văn bản
-                      </button>
+                    <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                            <FileText className="w-5 h-5" />
+                        </div>
+                        <h2 className="font-bold text-slate-700 text-lg">Bài làm của học sinh</h2>
                     </div>
 
                     <div className="p-6 flex-1 flex flex-col">
-                      {activeTab === 'image' ? (
-                        <div className="flex-1 flex flex-col">
-                          {!imagePreview ? (
-                            <div 
-                              onClick={() => fileInputRef.current?.click()}
-                              className="flex-1 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors group"
-                            >
-                              <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                <UploadCloud className="w-8 h-8 text-blue-500" />
-                              </div>
-                              <h3 className="text-lg font-bold text-slate-700 mb-1">Click để chọn ảnh</h3>
-                              <p className="text-sm text-slate-500 text-center px-4">Tải lên ảnh chụp bài viết tay của học sinh.<br/>AI sẽ tự động đọc chữ và phân tích.</p>
-                              <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                onChange={handleImageUpload} 
-                                accept="image/*" 
-                                className="hidden" 
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex-1 relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center group">
-                              <img src={imagePreview} alt="Preview" className="max-h-full object-contain" />
-                              <button 
-                                onClick={removeImage}
-                                className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-md text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                                title="Xóa ảnh"
-                              >
-                                <X className="w-5 h-5" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
                         <textarea
-                          className="flex-1 w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all outline-none"
-                          placeholder="Nhập hoặc dán bài văn của học sinh vào đây..."
+                          className="flex-1 w-full p-5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all outline-none text-slate-700 leading-relaxed"
+                          placeholder="Nhập hoặc dán trực tiếp bài văn của học sinh vào khu vực này..."
                           value={text}
                           onChange={(e) => setText(e.target.value)}
                           disabled={isScoring}
                         />
-                      )}
                       
                       <div className="mt-6 flex justify-center">
                         <button
                           onClick={handleScore}
-                          disabled={isScoring || (activeTab === 'image' ? !imageBase64 : text.length === 0)}
+                          disabled={isScoring || text.length === 0}
                           className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-lg shadow-sm ${
-                            isScoring || (activeTab === 'image' ? !imageBase64 : text.length === 0)
+                            isScoring || text.length === 0
                               ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
                               : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5'
                           }`}
@@ -419,7 +319,7 @@
                           {isScoring ? (
                             <>
                               <Loader2 className="w-6 h-6 animate-spin" />
-                              AI Đang đọc & chấm bài...
+                              AI Đang phân tích và chấm bài...
                             </>
                           ) : (
                             <>
@@ -450,7 +350,7 @@
                         </div>
                         <div className="text-center">
                           <p className="font-bold text-lg text-slate-600 animate-pulse mb-2">Hệ thống đang phân tích...</p>
-                          <p className="text-sm">Bao gồm: OCR Nhận diện chữ viết & Đánh giá 6 tiêu chí</p>
+                          <p className="text-sm">Đang đánh giá 6 tiêu chí và đề xuất cách sửa lỗi</p>
                         </div>
                       </div>
                     ) : result ? (
@@ -470,17 +370,6 @@
                           </div>
                         </div>
 
-                        {activeTab === 'image' && result.extractedText && (
-                          <div>
-                            <h3 className="text-sm font-bold uppercase text-slate-500 mb-3 flex items-center gap-2">
-                              <ImageIcon className="w-4 h-4" /> Bản dịch từ ảnh (OCR)
-                            </h3>
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm italic text-slate-700 leading-relaxed">
-                              "{result.extractedText}"
-                            </div>
-                          </div>
-                        )}
-
                         <div>
                           <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-slate-800">
                             <BarChart3 className="w-5 h-5 text-blue-600" />
@@ -499,7 +388,7 @@
                         <div>
                           <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-slate-800">
                             <Sparkles className="w-5 h-5 text-blue-600" />
-                            Nhận xét chi tiết
+                            Nhận xét & Sửa lỗi
                           </h3>
                           <div className="space-y-4">
                             <FeedbackBox title="Điểm mạnh cần phát huy" items={result.feedback.strengths} colorClass="bg-emerald-50 border-emerald-200 text-emerald-900" bulletClass="bg-emerald-500" />
@@ -535,7 +424,6 @@
           );
         }
 
-        // Render ứng dụng
         const root = createRoot(document.getElementById('root'));
         root.render(<SmartScoringApp />);
     </script>
