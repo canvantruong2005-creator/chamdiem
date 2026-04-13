@@ -51,7 +51,17 @@
           for (let i = 0; i < retries; i++) {
             try {
               const response = await fetch(url, options);
-              if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+              if (!response.ok) {
+                let errorMsg = `HTTP error! status: ${response.status}`;
+                try {
+                  // Lấy thông báo lỗi chi tiết từ Google API
+                  const errorData = await response.json();
+                  if (errorData.error && errorData.error.message) {
+                    errorMsg = errorData.error.message;
+                  }
+                } catch (e) {}
+                throw new Error(errorMsg);
+              }
               return await response.json();
             } catch (error) {
               if (i === retries - 1) throw error;
@@ -191,8 +201,13 @@
                 throw new Error("Không nhận được phản hồi hợp lệ từ AI");
               }
             } catch (err) {
-              // Hiển thị lỗi chi tiết để dễ dàng kiểm tra
-              setError(`Lỗi hệ thống: ${err.message}. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`);
+              // Phân biệt lỗi rõ ràng để người dùng không bị nhầm lẫn
+              if (err.message.includes("API key not valid") || err.message.includes("API_KEY_INVALID")) {
+                setError("Lỗi: API Key của bạn không hợp lệ hoặc không có quyền truy cập. Vui lòng kiểm tra lại mã API.");
+              } else {
+                const action = activeTab === 'text' ? 'chấm điểm văn bản' : 'đọc ảnh';
+                setError(`Lỗi hệ thống khi ${action}: ${err.message}`);
+              }
               console.error(err);
             } finally {
               setIsScoring(false);
